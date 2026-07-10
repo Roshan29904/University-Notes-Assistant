@@ -30,6 +30,13 @@ def load_vectorstore(path: str=VECTORSTORE_DIR):
     return FAISS.load_local(path, embeddings=embeddings, allow_dangerous_deserialization=True)
     
 
-    
+
+def add_documents(store: FAISS, chunks: List[Document]):
+    store.add_documents(chunks)
+    return store
+
+
+def get_retriever(store: FAISS, k: int = 4):
+    return store.as_retriever(search_type = "similarity", search_kwargs={"k":k})
 
 
