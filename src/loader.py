@@ -13,3 +13,9 @@ def load_pdf(file_path: str):
         
     return docs
 
+def save_uploaded_file(uploaded_file, save_dir: str = "data/uploaded_pdfs") -> str:
+    os.makedirs(save_dir, exist_ok=True)
+    save_path = os.path.join(save_dir, uploaded_file.name)
+    with open(save_path, "wb") as f:
+        f.write(uploaded_file.getbuffer())
+    return save_path
