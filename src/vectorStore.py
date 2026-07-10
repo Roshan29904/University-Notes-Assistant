@@ -22,6 +22,14 @@ def save_vectorstore(store: FAISS, path: str=VECTORSTORE_DIR):
     store.save_local(path)
 
 
+def load_vectorstore(path: str=VECTORSTORE_DIR):
+    if not os.path.exists(path):
+        return None
+    embeddings = get_embeddings
+    
+    return FAISS.load_local(path, embeddings=embeddings, allow_dangerous_deserialization=True)
+    
 
+    
 
 
