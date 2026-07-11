@@ -1,72 +1,100 @@
+from langchain.agents import create_agent
 from langchain.tools import Tool
-from langchain.agents import create_react_agent, AgentExecutor
-from langchain_core.prompts import PromptTemplate
-
+from langchain_core.prompts import ChatPromptTemplate
 
 from src.llm import get_llm
 from src.tools import get_all_tools
 
 
-Agent_system_instructions = """You are a helpful and an expert university notes assistant helping a student.
-                                You have access to the following tools: {tools}
-                                Always try the the notes_search tool first, as it searches the notes uploded bu the students.
-                                Use the Web_serach if the notes do not contain the answer or if there is not much context about the question and answer in the notes.
-                                Use the claculator for any math problem or engineering calculations, also you can use the web search tool be the problem is not sloved by the calculator tool
-                                
-                                Use the following format:
-
-                                Question: the input question you must answer
-                                Thought: think about what to do
-                                Action: the action to take, must be one of [{tool_names}]
-                                Action Input: the input to the action
-                                Observation: the result of the action
-                                ... (this Thought/Action/Action Input/Observation can repeat)
-                                Thought: now i know the final answer
-                                Final Answer: the final answer to the original question, written clearly
-                                for a student
-
-                                Question: {input}
-                                Thought:{agent}
-                            """
-                            
-   
-
-AGENT_PROMT = PromptTemplate.from_template(Agent_system_instructions)
-
 def create_notes_search_tool(retriever):
-    """Creates a tool for searching the user's uploaded notes."""
-    def search_notes(query):
-        docs = retriever.invoke(query)
+    """
+    Creates a tool for searching the student's uploaded notes.
+    """
+
+    def search_notes(query: str):
+        docs = retriever.invoke(query) or []
+
         if not docs:
-            return "No information found in the uploaded notes."
-        parts = []
-        for d in docs:
-            source = d.metadata.get("source", "unknown")
-            page = d.metadata.get("page", "?")
-            parts.append(f"(Source:{source}, page:{page})\n{d.page_content}")
-        return "\n\n".join(parts)
+            return (
+                "No relevant information was found in the uploaded notes."
+            )
+
+        results = []
+
+        for doc in docs:
+            source = doc.metadata.get("source", "Unknown")
+            page = doc.metadata.get("page", "Unknown")
+
+            results.append(
+                f"""
+                    Source : {source}
+                    Page   : {page}
+                    {doc.page_content}  
+                """
+            )
+
+        return "\n\n".join(results)
 
     return Tool(
         name="notes_search",
         func=search_notes,
-        description="Search the uploaded notes by the student for relevant information. Always try this before web search."
+        description=(
+            "Search the student's uploaded notes for information. "
+            "Always use this tool first before using web_search."
+        ),
     )
 
-def build_agent(retriver):
-    """Construct the full ReAct agent with all tools attached."""
-    notes_search_tool = create_notes_search_tool(retriver)
-    tools = get_all_tools(notes_search_tool)
-    
+
+def build_agent(retriever):
+    """
+    Build the University Notes AI Agent.
+    """
+
     llm = get_llm()
-    agent = create_react_agent(llm=llm, tools=tools, prompt=AGENT_PROMT)
-    
-    executor = AgentExecutor(
-        agent=agent,
-        tools=tools,
-        verbose=True,
-        handle_parsing_errors=True,
-        max_iterations=6,
+
+    notes_tool = create_notes_search_tool(retriever)
+
+    tools = get_all_tools(notes_tool)
+
+    # This prompt template is crucial for the agent to decide which tool to use.
+    # It includes a placeholder for the "agent_scratchpad" where the agent's
+    # intermediate steps (thoughts and tool calls) are stored.
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                """You are an expert University Notes Assistant.
+
+Your job is to answer student questions accurately.
+
+Follow these rules:
+
+1. ALWAYS search the uploaded notes first using notes_search.
+
+2. If the uploaded notes do not contain enough information, use the web_search tool.
+
+3. For arithmetic, mathematics, engineering calculations, numerical computation, unit conversions, or formulas, use the calculator tool.
+
+4. Combine information from multiple tools whenever necessary.
+
+5. If the notes contain the answer, prefer the notes over the web.
+
+6. If neither the notes nor the web contain the answer, politely tell the student that you could not find enough reliable information.
+
+7. Explain concepts clearly as if teaching a university student.
+
+8. When information comes from the uploaded notes, mention the source and page number whenever available.""",
+            ),
+            ("placeholder", "{chat_history}"),
+            ("human", "{input}"),
+            ("placeholder", "{agent_scratchpad}"),
+        ]
     )
-    
-    return executor
-                            
+
+    agent = create_agent(
+        llm,
+        tools,
+        prompt,
+    )
+
+    return agent
