@@ -28,3 +28,9 @@ def calculator(expression: str) -> str:
         return str(result)
     except Exception as e:
         return f"Erroe evaluating expression '{expression}' : {e}"
+    
+    
+# get all tools
+def get_all_tools(tools: Tool) -> list:
+    """Assemble the full toolset given the notes RAG """
+    return [tools, get_web_search_tool(), calculator]
