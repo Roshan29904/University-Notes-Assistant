@@ -7,3 +7,8 @@ RAG_system_prompt = """you are a helpful and expert university teaching assistan
                 context:{context}"""
                 
 
+RAG_prompt = ChatPromptTemplate.from_messages([
+    ("system", RAG_system_prompt),
+    ("placeholder","{chat_history}"),
+    ("human","{question}")
+])
