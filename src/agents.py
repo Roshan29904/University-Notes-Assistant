@@ -1,5 +1,5 @@
 from langchain.tools import Tool
-from langchain.agents import create_agent
+from langchain.agents import create_react_agent, AgentExecutor
 from langchain_core.prompts import PromptTemplate
 
 
@@ -33,31 +33,40 @@ Agent_system_instructions = """You are a helpful and an expert university notes 
 
 AGENT_PROMT = PromptTemplate.from_template(Agent_system_instructions)
 
-def notes_tool(retriever):
+def create_notes_search_tool(retriever):
+    """Creates a tool for searching the user's uploaded notes."""
     def search_notes(query):
         docs = retriever.invoke(query)
         if not docs:
-            return "No information found in the uploded notes" 
+            return "No information found in the uploaded notes."
         parts = []
         for d in docs:
-            source = d.metadata.get("source", "unknow")
+            source = d.metadata.get("source", "unknown")
             page = d.metadata.get("page", "?")
             parts.append(f"(Source:{source}, page:{page})\n{d.page_content}")
-            return "\n\n".join(parts)
-        tools = Tool(
-            name = "notes_search",
-            func = search_notes,
-            description = (
-                """Search the uploaded notes by the student for relevant information.
-                   Always try this before web search"""
-            )
-        )                   
-                    
-                    
+        return "\n\n".join(parts)
 
+    return Tool(
+        name="notes_search",
+        func=search_notes,
+        description="Search the uploaded notes by the student for relevant information. Always try this before web search."
+    )
 
+def build_agent(retriver):
+    """Construct the full ReAct agent with all tools attached."""
+    notes_search_tool = create_notes_search_tool(retriver)
+    tools = get_all_tools(notes_search_tool)
+    
+    llm = get_llm()
+    agent = create_react_agent(llm=llm, tools=tools, prompt=AGENT_PROMT)
+    
+    executor = AgentExecutor(
+        agent=agent,
+        tools=tools,
+        verbose=True,
+        handle_parsing_errors=True,
+        max_iterations=6,
+    )
+    
+    return executor
                             
-
-
-
-
