@@ -44,3 +44,27 @@ def summarize_text(text: str)-> str:
     return text_prompt(SUMMARIZE_PROMT, text)
 
 
+def generate_quiz(text:str, num_questions: int=7)->str:
+    return text_prompt(QUIZ_PROMPT, text, num_questions)
+
+def generate_short_notes(text: str) -> str:
+    return text_prompt(SHORT_NOTES_PROMPT, text)
+
+
+def explain_simply(text: str) -> str:
+    return text_prompt(EXPLAIN_SIMPLY_PROMPT, text)
+
+
+def extract_formulas(text: str) -> str:
+    return text_prompt(EXTRACT_FORMULAS_PROMPT, text)
+
+
+def generate_exam_questions(text: str, num_questions: int = 5) -> str:
+    return text_prompt(EXAM_QUESTIONS_PROMPT, text, num_questions)
+
+
+def search_topic(topic: str, docs: List[Document]) -> str:
+    text = context(docs)
+    llm = get_llm()
+    chain = TOPIC_SEARCH_PROMPT | llm | StrOutputParser()
+    return chain.invoke({"topic": topic, "text": text})
