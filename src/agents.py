@@ -33,8 +33,28 @@ Agent_system_instructions = """You are a helpful and an expert university notes 
 
 AGENT_PROMT = PromptTemplate.from_template(Agent_system_instructions)
 
-                         
+def notes_tool(retriever):
+    def search_notes(query):
+        docs = retriever.invoke(query)
+        if not docs:
+            return "No information found in the uploded notes" 
+        parts = []
+        for d in docs:
+            source = d.metadata.get("source", "unknow")
+            page = d.metadata.get("page", "?")
+            parts.append(f"(Source:{source}, page:{page})\n{d.page_content}")
+            return "\n\n".join(parts)
+        tools = Tool(
+            name = "notes_search",
+            func = search_notes,
+            description = (
+                """Search the uploaded notes by the student for relevant information.
+                   Always try this before web search"""
+            )
+        )                   
                     
+                    
+
 
                             
 
