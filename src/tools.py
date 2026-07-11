@@ -10,8 +10,21 @@ def get_web_search_tool() -> Tool:
         name = "web_search",
         function = search.run,
         description = ("""Use this when the answer cannot be found in the uploaded notes and,
-                          when the context about a topic is not enough to answer.""" 
+                          when the context about a topic is not enough to answer.
+                          Also it can be used when uable to slove a problem """ 
         )
     )
     
     
+# calculate
+@tool
+def calculator(expression: str) -> str:
+    """Evaluate a numeric/math expression, example '12*(3+4)/2' or 'sqrt(144) + 5**2'.
+       Use this arithmetic, algebra or engineering calculations.
+       Input must be valid maths expression string.
+    """
+    try:
+        result = numexpr.evaluate(expression).item()
+        return str(result)
+    except Exception as e:
+        return f"Erroe evaluating expression '{expression}' : {e}"
