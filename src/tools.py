@@ -8,13 +8,13 @@ def get_web_search_tool() -> Tool:
     search = DuckDuckGoSearchRun()
     web_search = Tool(
         name = "web_search",
-        function = search.run,
+        func = search.run,
         description = ("""Use this when the answer cannot be found in the uploaded notes and,
                           when the context about a topic is not enough to answer.
                           Also it can be used when uable to slove a problem """ 
         )
     )
-    
+    return web_search
     
 # calculate
 @tool
@@ -32,5 +32,5 @@ def calculator(expression: str) -> str:
     
 # get all tools
 def get_all_tools(tools: Tool) -> list:
-    """Assemble the full toolset given the notes RAG """
+    """Assemble the full toolset for the agent, including the notes search tool, web search tool, and calculator tool."""
     return [tools, get_web_search_tool(), calculator]
