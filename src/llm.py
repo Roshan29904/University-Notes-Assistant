@@ -11,7 +11,8 @@ def get_llm():
         task="text-generation",
         huggingfacehub_api_token=os.getenv("HUGGINGFACEHUB_API_TOKEN"),
         temperature = 0.65,
-        max_new_tokens = 1024
+        max_new_tokens = 1024,
+        streaming = True,
     )
 
     model = ChatHuggingFace(llm=llm)

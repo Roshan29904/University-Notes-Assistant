@@ -1,6 +1,5 @@
 from langchain.agents import create_agent
-from langchain.tools import Tool
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.tools import tool
 
 from src.llm import get_llm
 from src.tools import get_all_tools
@@ -11,38 +10,31 @@ def create_notes_search_tool(retriever):
     Creates a tool for searching the student's uploaded notes.
     """
 
+    @tool
     def search_notes(query: str):
+        """
+        Search the student's uploaded notes for information.
+        Always use this tool first before using web_search.
+        """
         docs = retriever.invoke(query) or []
 
         if not docs:
-            return (
-                "No relevant information was found in the uploaded notes."
-            )
+            return "No relevant information was found in the uploaded notes."
 
         results = []
-
         for doc in docs:
             source = doc.metadata.get("source", "Unknown")
             page = doc.metadata.get("page", "Unknown")
-
             results.append(
                 f"""
                     Source : {source}
                     Page   : {page}
-                    {doc.page_content}  
+                    {doc.page_content}
                 """
             )
-
         return "\n\n".join(results)
 
-    return Tool(
-        name="notes_search",
-        func=search_notes,
-        description=(
-            "Search the student's uploaded notes for information. "
-            "Always use this tool first before using web_search."
-        ),
-    )
+    return search_notes
 
 
 def build_agent(retriever):
@@ -56,14 +48,12 @@ def build_agent(retriever):
 
     tools = get_all_tools(notes_tool)
 
-    # This prompt template is crucial for the agent to decide which tool to use.
-    # It includes a placeholder for the "agent_scratchpad" where the agent's
-    # intermediate steps (thoughts and tool calls) are stored.
-    prompt = ChatPromptTemplate.from_messages(
-        [
-            (
-                "system",
-                """You are an expert University Notes Assistant.
+    # As of the current langchain.agents API, create_agent builds a LangGraph
+    # ReAct-style agent and no longer accepts a ChatPromptTemplate with
+    # "agent_scratchpad" / "input" placeholders. Instead it takes a plain
+    # string (or SystemMessage) via `system_prompt`, and message/tool-call
+    # bookkeeping is handled internally by the graph.
+    system_prompt = """You are an expert University Notes Assistant.
 
 Your job is to answer student questions accurately.
 
@@ -83,18 +73,12 @@ Follow these rules:
 
 7. Explain concepts clearly as if teaching a university student.
 
-8. When information comes from the uploaded notes, mention the source and page number whenever available.""",
-            ),
-            ("placeholder", "{chat_history}"),
-            ("human", "{input}"),
-            ("placeholder", "{agent_scratchpad}"),
-        ]
-    )
+8. When information comes from the uploaded notes, mention the source and page number whenever available."""
 
     agent = create_agent(
-        llm,
-        tools,
-        prompt,
+        model=llm,
+        tools=tools,
+        system_prompt=system_prompt,
     )
 
     return agent
