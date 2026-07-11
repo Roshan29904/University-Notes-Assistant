@@ -23,13 +23,11 @@ def save_vectorstore(store: FAISS, path: str=VECTORSTORE_DIR):
 
 
 def load_vectorstore(path: str=VECTORSTORE_DIR):
-    if not os.path.exists(path):
+    if not path or not os.path.exists(os.path.join(path, "index.faiss")):
         return None
     embeddings = get_embeddings()
-    
-    return FAISS.load_local(path, embeddings=embeddings, allow_dangerous_deserialization=True)
-    
 
+    return FAISS.load_local(path, embeddings=embeddings, allow_dangerous_deserialization=True)
 
 def add_documents(store: FAISS, chunks: List[Document]):
     store.add_documents(chunks)
