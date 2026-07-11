@@ -53,7 +53,7 @@ def build_agent(retriever):
     # "agent_scratchpad" / "input" placeholders. Instead it takes a plain
     # string (or SystemMessage) via `system_prompt`, and message/tool-call
     # bookkeeping is handled internally by the graph.
-    system_prompt = """You are an expert University Notes Assistant.
+    system_prompt = r"""You are an expert University Notes Assistant.
 
 Your job is to answer student questions accurately.
 
@@ -73,7 +73,9 @@ Follow these rules:
 
 7. Explain concepts clearly as if teaching a university student.
 
-8. When information comes from the uploaded notes, mention the source and page number whenever available."""
+8. When information comes from the uploaded notes, mention the source and page number whenever available.
+
+9. When writing any mathematical expression, equation, or formula, format it using dollar-sign delimiters: $...$ for inline math and $$...$$ for standalone/block equations. Never use \( \), \[ \], or other LaTeX delimiter styles."""
 
     agent = create_agent(
         model=llm,
