@@ -86,11 +86,14 @@ def get_or_build_agent():
         with st.spinner("Setting up the assistant..."):
             try:
                 st.session_state.agent = build_agent(st.session_state.retriever)
+                st.session_state.agent_error = ""
             except Exception as exc:
-                raise RuntimeError(
+                st.session_state.agent = None
+                st.session_state.agent_error = (
                     "The assistant could not start because the Hugging Face token is missing or invalid. "
                     "Add HUGGINGFACEHUB_API_TOKEN to your environment or .env file."
-                ) from exc
+                )
+                return None
     return st.session_state.agent
  
  
@@ -201,20 +204,21 @@ with tab_chat:
             st.markdown(query)
  
         agent = get_or_build_agent()
+        if agent is None:
+            error_msg = st.session_state.get(
+                "agent_error",
+                "The assistant could not start because the Hugging Face token is missing or invalid."
+            )
+            st.warning(error_msg)
+            st.session_state.display_messages.append({"role": "assistant", "content": error_msg})
+            st.rerun()
+            st.stop()
+
         st.session_state.agent_messages.append({"role": "user", "content": query})
- 
+
         with st.chat_message("assistant"):
             final_state = {}
             try:
-                # Streamed live as raw chunks (math delimiters may show
-                # unrendered momentarily); the rerun below re-displays the
-                # final message through render_math() for correct formatting.
-                answer = st.write_stream(
-                    stream_agent_reply(agent, st.session_state.agent_messages, final_state)
-                )
-                st.session_state.agent_messages = final_state.get(
-                    "messages", st.session_state.agent_messages
-                )
             except Exception as e:
                 answer = f"Something went wrong while answering: {e}"
                 st.markdown(answer)
