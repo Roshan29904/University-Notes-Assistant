@@ -9,15 +9,17 @@ from src.vectorStore import build_vectorstore, save_vectorstore, load_vectorstor
 from src.RAG import question_answer, summarize_text, generate_quiz, generate_short_notes, explain_simply, extract_formulas, generate_exam_questions, search_topic
 from src.agents import build_agent
 
-load_dotenv()
-load_dotenv(override=True)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ENV_PATH = os.path.join(BASE_DIR, ".env")
+
+load_dotenv(dotenv_path=ENV_PATH, override=True)
+load_dotenv(dotenv_path=ENV_PATH, override=True)
 
 hf_token = os.getenv("HUGGINGFACEHUB_API_TOKEN") or os.getenv("HF_TOKEN")
 if hf_token:
     os.environ["HF_TOKEN"] = hf_token
     os.environ["HUGGINGFACEHUB_API_TOKEN"] = hf_token
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_VECTORSTORE_DIR = os.path.join(BASE_DIR, "data", "vectorstore")
 DEFAULT_UPLOAD_DIR = os.path.join(BASE_DIR, "data", "uploaded_pdfs")
 
