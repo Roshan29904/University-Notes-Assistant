@@ -9,12 +9,18 @@ load_dotenv(dotenv_path=ENV_PATH, override=True)
 
 def get_llm():
     token = os.getenv("HUGGINGFACEHUB_API_TOKEN") or os.getenv("HF_TOKEN")
+    if not token:
+        try:
+            import streamlit as st
+            token = st.secrets.get("HUGGINGFACEHUB_API_TOKEN") or st.secrets.get("HF_TOKEN")
+        except Exception:
+            token = None
     if token:
-        os.environ["HUGGINGFACEHUB_API_TOKEN"] = token
-        os.environ["HF_TOKEN"] = token
+        os.environ["HUGGINGFACEHUB_API_TOKEN"] = str(token)
+        os.environ["HF_TOKEN"] = str(token)
     else:
         raise RuntimeError(
-            "Hugging Face token is missing. Add HUGGINGFACEHUB_API_TOKEN to your .env file or environment."
+            "Hugging Face token is missing. Add HUGGINGFACEHUB_API_TOKEN to your environment, .env file, or Streamlit secrets."
         )
 
     model_name = (os.getenv("HF_CHAT_MODEL") or "Qwen/Qwen2.5-Coder-32B-Instruct").strip()
