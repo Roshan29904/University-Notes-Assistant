@@ -15,10 +15,20 @@ ENV_PATH = os.path.join(BASE_DIR, ".env")
 load_dotenv(dotenv_path=ENV_PATH, override=True)
 load_dotenv(dotenv_path=ENV_PATH, override=True)
 
-hf_token = os.getenv("HUGGINGFACEHUB_API_TOKEN") or os.getenv("HF_TOKEN")
-if hf_token:
-    os.environ["HF_TOKEN"] = hf_token
-    os.environ["HUGGINGFACEHUB_API_TOKEN"] = hf_token
+def get_hf_token():
+    token = os.getenv("HUGGINGFACEHUB_API_TOKEN") or os.getenv("HF_TOKEN")
+    if not token:
+        try:
+            token = st.secrets.get("HUGGINGFACEHUB_API_TOKEN") or st.secrets.get("HF_TOKEN")
+        except Exception:
+            token = None
+    if token:
+        os.environ["HF_TOKEN"] = str(token)
+        os.environ["HUGGINGFACEHUB_API_TOKEN"] = str(token)
+    return token
+
+
+hf_token = get_hf_token()
 
 DEFAULT_VECTORSTORE_DIR = os.path.join(BASE_DIR, "data", "vectorstore")
 DEFAULT_UPLOAD_DIR = os.path.join(BASE_DIR, "data", "uploaded_pdfs")
