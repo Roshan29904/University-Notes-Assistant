@@ -219,10 +219,16 @@ with tab_chat:
         with st.chat_message("assistant"):
             final_state = {}
             try:
+                answer = st.write_stream(
+                    stream_agent_reply(agent, st.session_state.agent_messages, final_state)
+                )
+                st.session_state.agent_messages = final_state.get(
+                    "messages", st.session_state.agent_messages
+                )
             except Exception as e:
                 answer = f"Something went wrong while answering: {e}"
                 st.markdown(answer)
- 
+
         st.session_state.display_messages.append({"role": "assistant", "content": answer})
         st.rerun()
  
