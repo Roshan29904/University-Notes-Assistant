@@ -10,6 +10,12 @@ from src.RAG import question_answer, summarize_text, generate_quiz, generate_sho
 from src.agents import build_agent
 
 load_dotenv()
+load_dotenv(override=True)
+
+hf_token = os.getenv("HUGGINGFACEHUB_API_TOKEN") or os.getenv("HF_TOKEN")
+if hf_token:
+    os.environ["HF_TOKEN"] = hf_token
+    os.environ["HUGGINGFACEHUB_API_TOKEN"] = hf_token
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_VECTORSTORE_DIR = os.path.join(BASE_DIR, "data", "vectorstore")
@@ -78,7 +84,13 @@ def get_or_build_agent():
         return None
     if st.session_state.agent is None:
         with st.spinner("Setting up the assistant..."):
-            st.session_state.agent = build_agent(st.session_state.retriever)
+            try:
+                st.session_state.agent = build_agent(st.session_state.retriever)
+            except Exception as exc:
+                raise RuntimeError(
+                    "The assistant could not start because the Hugging Face token is missing or invalid. "
+                    "Add HUGGINGFACEHUB_API_TOKEN to your environment or .env file."
+                ) from exc
     return st.session_state.agent
  
  
