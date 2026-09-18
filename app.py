@@ -11,11 +11,24 @@ from src.agents import build_agent
 
 load_dotenv()
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_VECTORSTORE_DIR = os.path.join(BASE_DIR, "data", "vectorstore")
+DEFAULT_UPLOAD_DIR = os.path.join(BASE_DIR, "data", "uploaded_pdfs")
 
 
-VECTORSTORE_DIR = os.getenv("VECTORSTORE_DIR")
-UPLOAD_DIR = os.getenv("UPLOAD_DIR")
- 
+def resolve_storage_dir(env_value: str | None, fallback: str) -> str:
+    value = (env_value or "").strip()
+    if value:
+        return os.path.abspath(value)
+    return os.path.abspath(fallback)
+
+
+VECTORSTORE_DIR = resolve_storage_dir(os.getenv("VECTORSTORE_DIR"), DEFAULT_VECTORSTORE_DIR)
+UPLOAD_DIR = resolve_storage_dir(os.getenv("UPLOAD_DIR"), DEFAULT_UPLOAD_DIR)
+
+os.makedirs(VECTORSTORE_DIR, exist_ok=True)
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
 
 
 def render_math(text: str) -> str:

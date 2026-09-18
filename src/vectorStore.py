@@ -8,7 +8,9 @@ from  src.embeddings import get_embeddings
 
 load_dotenv()
 
-VECTORSTORE_DIR = os.getenv("VECTORSTORE_DIR")
+VECTORSTORE_DIR = os.getenv("VECTORSTORE_DIR") or os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "vectorstore"
+)
 
 
 def build_vectorstore(chunks: List[Document]) -> FAISS:
@@ -17,12 +19,14 @@ def build_vectorstore(chunks: List[Document]) -> FAISS:
     return store
 
 
-def save_vectorstore(store: FAISS, path: str=VECTORSTORE_DIR):
+def save_vectorstore(store: FAISS, path: str = VECTORSTORE_DIR):
+    if not path:
+        return
     os.makedirs(path, exist_ok=True)
     store.save_local(path)
 
 
-def load_vectorstore(path: str=VECTORSTORE_DIR):
+def load_vectorstore(path: str = VECTORSTORE_DIR):
     if not path or not os.path.exists(os.path.join(path, "index.faiss")):
         return None
     embeddings = get_embeddings()
