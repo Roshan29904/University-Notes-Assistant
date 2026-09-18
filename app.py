@@ -1,13 +1,33 @@
 import os
-import re 
+import re
+import uuid
+
 import streamlit as st
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessageChunk
-from src.loader import load_pdf, save_uploaded_file
-from src.splitter import splitter_doc
-from src.vectorStore import build_vectorstore, save_vectorstore, load_vectorstore, add_documents, get_retriever
-from src.RAG import question_answer, summarize_text, generate_quiz, generate_short_notes, explain_simply, extract_formulas, generate_exam_questions, search_topic
+
 from src.agents import build_agent
+from src.loader import load_pdf, save_uploaded_file
+from src.persistence import (
+    load_chat_history,
+    load_doc_texts,
+    load_processed_files,
+    save_chat_history,
+    save_doc_texts,
+    save_processed_files,
+)
+from src.RAG import (
+    explain_simply,
+    extract_formulas,
+    generate_exam_questions,
+    generate_quiz,
+    generate_short_notes,
+    question_answer,
+    search_topic,
+    summarize_text,
+)
+from src.splitter import splitter_doc
+from src.vectorStore import add_documents, build_vectorstore, get_retriever, load_vectorstore, save_vectorstore
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ENV_PATH = os.path.join(BASE_DIR, ".env")
@@ -32,6 +52,9 @@ hf_token = get_hf_token()
 
 DEFAULT_VECTORSTORE_DIR = os.path.join(BASE_DIR, "data", "vectorstore")
 DEFAULT_UPLOAD_DIR = os.path.join(BASE_DIR, "data", "uploaded_pdfs")
+DEFAULT_HISTORY_PATH = os.path.join(BASE_DIR, "data", "chat_history.json")
+DEFAULT_PROCESSED_FILES_PATH = os.path.join(BASE_DIR, "data", "processed_files.json")
+DEFAULT_DOC_TEXTS_PATH = os.path.join(BASE_DIR, "data", "doc_texts.json")
 
 
 def resolve_storage_dir(env_value: str | None, fallback: str) -> str:
@@ -71,19 +94,29 @@ def init_state():
         "vectorstore": None,
         "retriever": None,
         "agent": None,
-        "agent_messages": [],  # fed into the agent graph on every turn
-        "display_messages": [],  # what's rendered in the chat UI
-        "doc_texts": {},  # filename -> full extracted text (for study tools)
+        "agent_messages": [],
+        "display_messages": [],
+        "doc_texts": {},
         "processed_files": set(),
+        "enable_web_search": True,
     }
     for key, value in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = value
- 
- 
+
+    if "fresh_session_reset" not in st.session_state:
+        st.session_state["fresh_session_reset"] = True
+        # Ignore any persisted uploaded data for a brand-new deployment/browser session.
+        st.session_state.doc_texts = {}
+        st.session_state.processed_files = set()
+        save_processed_files(DEFAULT_PROCESSED_FILES_PATH, [])
+        save_doc_texts(DEFAULT_DOC_TEXTS_PATH, {})
+        save_chat_history(DEFAULT_HISTORY_PATH, [])
+
+
 init_state()
- 
-# Try to pick up a previously saved index so notes persist across restarts.
+
+# Keep the app clean on each new site opening, while allowing the active session to work normally.
 if st.session_state.vectorstore is None:
     store = load_vectorstore(VECTORSTORE_DIR)
     if store is not None:
@@ -92,12 +125,13 @@ if st.session_state.vectorstore is None:
  
  
 def get_or_build_agent():
-    if st.session_state.retriever is None:
-        return None
-    if st.session_state.agent is None:
+    if st.session_state.agent is None or getattr(st.session_state.agent, "web_search_enabled", False) != st.session_state.get("enable_web_search", True):
         with st.spinner("Setting up the assistant..."):
             try:
-                st.session_state.agent = build_agent(st.session_state.retriever)
+                st.session_state.agent = build_agent(
+                    st.session_state.retriever,
+                    web_search_enabled=st.session_state.get("enable_web_search", True),
+                )
                 st.session_state.agent_error = ""
             except Exception as exc:
                 st.session_state.agent = None
@@ -130,78 +164,79 @@ def stream_agent_reply(agent, messages, final_state_holder):
  
 def process_uploaded_files(uploaded_files):
     new_chunks = []
- 
+
     for uploaded_file in uploaded_files:
         if uploaded_file.name in st.session_state.processed_files:
             continue
- 
+
         save_path = save_uploaded_file(uploaded_file, save_dir=UPLOAD_DIR)
         docs = load_pdf(save_path)
- 
+
         st.session_state.doc_texts[uploaded_file.name] = "\n\n".join(
             doc.page_content for doc in docs
         )
- 
+
         chunks = splitter_doc(docs)
         new_chunks.extend(chunks)
         st.session_state.processed_files.add(uploaded_file.name)
- 
+
+    save_processed_files(DEFAULT_PROCESSED_FILES_PATH, sorted(st.session_state.processed_files))
+    save_doc_texts(DEFAULT_DOC_TEXTS_PATH, st.session_state.doc_texts)
+
     if not new_chunks:
         return
- 
+
     if st.session_state.vectorstore is None:
         st.session_state.vectorstore = build_vectorstore(new_chunks)
     else:
         st.session_state.vectorstore = add_documents(st.session_state.vectorstore, new_chunks)
- 
+
     save_vectorstore(st.session_state.vectorstore, VECTORSTORE_DIR)
     st.session_state.retriever = get_retriever(st.session_state.vectorstore)
- 
-    # The agent was built with the old retriever, so drop it and rebuild lazily.
     st.session_state.agent = None
- 
- 
-# ---------------------------------------------------------------------------
-# Sidebar - upload & index management
-# ---------------------------------------------------------------------------
+
+
 with st.sidebar:
     st.title("📚 University Notes Assistant")
     st.caption("Upload lecture notes (PDF), then chat or generate study material from them.")
- 
+
     uploaded_files = st.file_uploader(
         "Upload PDF notes", type=["pdf"], accept_multiple_files=True
     )
- 
+
     if st.button("Process documents", disabled=not uploaded_files, use_container_width=True):
         with st.spinner("Reading, chunking, and indexing your notes..."):
             process_uploaded_files(uploaded_files)
         st.success("Notes indexed. You can now chat or use the study tools.")
- 
+
+    st.checkbox("Enable web search", key="enable_web_search")
+
     if st.session_state.processed_files:
         st.markdown("**Indexed documents**")
         for name in sorted(st.session_state.processed_files):
             st.markdown(f"- {name}")
- 
+
     st.divider()
     if st.button("Clear chat history", use_container_width=True):
         st.session_state.agent_messages = []
         st.session_state.display_messages = []
         st.rerun()
- 
- 
+
+
 if st.session_state.retriever is None:
     st.info("Upload and process at least one PDF from the sidebar to get started.")
     st.stop()
- 
+
+
 tab_chat, tab_tools = st.tabs(["💬 Chat", "🛠️ Study Tools"])
- 
+
 # st.chat_input only auto-pins itself to the bottom of the page when called
 # at the top level of the script - nested inside a tab/column/container, it
 # renders inline instead. So it's called here, outside `with tab_chat:`, and
 # the returned value is used inside the tab below.
 query = st.chat_input("Ask a question about your notes...")
- 
- 
+
+
 # ---------------------------------------------------------------------------
 # Chat tab - talks to the tool-using agent (notes search, web search, calculator)
 # ---------------------------------------------------------------------------
@@ -209,12 +244,12 @@ with tab_chat:
     for msg in st.session_state.display_messages:
         with st.chat_message(msg["role"]):
             st.markdown(render_math(msg["content"]))
- 
+
     if query:
         st.session_state.display_messages.append({"role": "user", "content": query})
         with st.chat_message("user"):
             st.markdown(query)
- 
+
         agent = get_or_build_agent()
         if agent is None:
             error_msg = st.session_state.get(
